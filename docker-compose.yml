@@ -3,7 +3,7 @@ version: '2'
 services:
   kong-admin:
     container_name: kong-admin
-    image: pantsel/konga
+    image: pantsel/konga:latest
     ports:
       - 1337:1337
     environment:
@@ -50,6 +50,22 @@ services:
     environment:
       - POSTGRES_USER=kong
       - POSTGRES_DB=kong
+    networks:
+      - kong-network
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - kong-network
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    ports:
+      - 3000:3000
     networks:
       - kong-network
 networks:
