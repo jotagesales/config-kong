@@ -12,3 +12,5 @@
 ``docker-compose up prometheus``
 ## up grafana
 ``docker-compose up grafana``
+## granafa dashboard
+``6486``
