@@ -1,27 +1,40 @@
-version: '2'
+version: '2.1'
 
 services:
-  kong-admin:
-    container_name: kong-admin
-    image: pantsel/konga:latest
-    ports:
-      - 1337:1337
-    environment:
-      - DB_ADAPTER=postgres
-      - DB_HOST=db
-      - DB_USER=kong
-      - DB_DATABASE=konga_db
-      - KONGA_HOOK_TIMEOUT=120000
-      - NODE_ENV=production
-    depends_on:
-      - kong
+
+  db:
+    container_name: kong_database
+    image: postgres:9.6
     volumes:
       - .data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=kong
+      - POSTGRES_DB=kong
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kong"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
     networks:
       - kong-network
+
+  kong-migration:
+    image: kong:0.14-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=db
+    networks:
+      - kong-network
+    command: kong migrations up
+
   kong:
     container_name: kong
-    image: kong:latest
+    image: kong:0.14-alpine
     ports:
       - 8000:8000
       - 8443:8443
@@ -39,37 +52,76 @@ services:
       - KONG_ADMIN_ERROR_LOG=/dev/stdout
       - KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      kong-migration:
+        condition: service_started
     networks:
       - kong-network
-  db:
-    container_name: kong_database
-    image: postgres:9.6
+
+  kong-admin-migration:
+    image: pantsel/konga:0.13.0
+    environment:
+      - DB_ADAPTER=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=kong
+      - DB_DATABASE=konga_db
+      - KONGA_LOG_LEVEL=debug
+    depends_on:
+      db:
+        condition: service_healthy
+    command: -c prepare
+    networks:
+      - kong-network
+
+  kong-admin:
+    container_name: kong-admin
+    image: pantsel/konga:0.13.0
+    ports:
+      - 1337:1337
+    environment:
+      - DB_ADAPTER=postgres
+      - DB_HOST=db
+      - DB_USER=kong
+      - DB_DATABASE=konga_db
+      - KONGA_HOOK_TIMEOUT=120000
+      - NODE_ENV=production
+    depends_on:
+      kong:
+        condition: service_started
+      kong-admin-migration:
+        condition: service_started
+
     volumes:
       - .data:/var/lib/postgresql/data
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_USER=kong
-      - POSTGRES_DB=kong
     networks:
       - kong-network
+
   prometheus:
     container_name: prometheus
     image: prom/prometheus
+    depends_on:
+      kong:
+        condition: service_started
     ports:
       - 9090:9090
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - kong-network
+
   grafana:
     container_name: grafana
     image: grafana/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
     ports:
       - 3000:3000
     networks:
       - kong-network
+
 networks:
   kong-network:
     driver: bridge
