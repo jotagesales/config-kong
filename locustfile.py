@@ -5,8 +5,9 @@ from locust import HttpLocust, TaskSet, task
 
 
 class MyTaskSet(TaskSet):
+    api_key = None
 
-    @task(10)
+    @task(5)
     def task1(self):
         transaction = str(uuid.uuid4())
         data = {
@@ -31,14 +32,14 @@ class MyTaskSet(TaskSet):
         }
         headers = {
             'Content-Type': 'application/json',
-            'apikey': 'Oq3FuZbEpzbNxwegDuSgy0GojFdYH7qE'
+            'apikey': self.api_key
         }
         self.client.post('/v1/notification/claro', data=json.dumps(data), headers=headers)
 
-    @task(1)
+    @task(3)
     def headers(self):
         headers = {
-            'apikey': 'Oq3FuZbEpzbNxwegDuSgy0GojFdYH7qE'
+            'apikey': self.api_key
         }
         self.client.get('/headers', headers=headers)
 
