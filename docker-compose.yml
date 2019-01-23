@@ -107,9 +107,14 @@ services:
     ports:
       - 9090:9090
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - kong-network
+
+  redis:
+    image: redis:3.2
+    ports:
+        - 6379:6379
 
   grafana:
     container_name: grafana
@@ -117,8 +122,20 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+      redis:
+        condition: service_started
     ports:
       - 3000:3000
+    user: "1001"
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    environment:
+      - GF_DATABASE_URL=postgres://kong@db:5432/grafana
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=123mudar
+      - GF_PATHS_LOGS=/dev/stdout
+      - GF_SERVER_PROTOCOL=http
+      - GF_SERVER_DOMAIN=localhost
     networks:
       - kong-network
 
